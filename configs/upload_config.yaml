@@ -1,0 +1,25 @@
+# Segments.ai 업로드 설정 (upload_to_segments.py, upload_label.py). 데이터 폴더는 calibration_config.yaml의 data_root를 씀.
+# API 키는 아래 api_key에 적는다 (명령 인자 --api-key로 주면 그 값이 우선).
+dataset: "<owner>/<dataset_name>"
+api_key: ""                   # Segments.ai에서 발급받은 API 키
+
+sample_name: "label_sample"   # 같은 데이터셋에 같은 이름의 샘플이 있으면 업로드 실패 → 새로 올릴 때 바꿀 것
+
+cameras: [camera1, camera2, camera3, camera6]
+cam_layout:                   # Segments.ai 화면의 카메라 배치 [행, 열]
+  camera1: [0, 0]
+  camera2: [0, 1]
+  camera3: [1, 0]
+  camera6: [1, 1]
+
+frame_index:                  # 업로드할 프레임 번호
+  start: 1
+  end: 100
+  step: 10
+  exclude: []
+
+correction: kalman            # kalman = camera_lidar_extrinsic.yaml의 프레임별 값(frames), none = 기준 외부 파라미터만
+
+label:                        # upload_label.py
+  sensor_name: "Lidar"
+  labelset: "ground-truth"

@@ -1,0 +1,32 @@
+# 데이터셋 (포인트 클라우드 데이터·영상). data_root로 지정한 폴더. 링크로 연결해도 걸리도록 끝에 / 없이
+/label_sample
+/data
+*.pcd
+*.bag
+*.mcap
+
+# 실행 결과 (깊이 맵, 측정·칼만 결과, 투영 영상, 업로드 미리보기, 실험 결과)
+/out
+
+# 모델 가중치. depth_map.py가 쓰는 Depth Anything V2 Small(약 99MB, Apache-2.0)만 저장소에 포함
+*.pth
+*.pt
+*.onnx
+!checkpoints/depth_anything_v2_vits.pth
+
+# 캐시
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+
+# API 키·개인 설정 (업로드 설정은 저장소의 upload_config.yaml에 키를 적지 말고 환경 변수로)
+.env
+*.local.yaml
+
+# 편집기·OS·로그
+.vscode/
+.idea/
+.DS_Store
+*.log
+*.swp

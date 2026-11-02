@@ -1,0 +1,10 @@
+# Python 3.10.12 (Ubuntu 22.04, NVIDIA Jetson AGX Orin JetPack 6.2.3)에서 확인한 버전
+# 설치: pip3 install -r requirements.txt
+# torch·torchvision은 깊이 맵 생성(depth_map.py)에만 필요하고 플랫폼마다 설치 방법이 달라 여기에 넣지 않음 (README 설치 참고).
+# 확인한 버전: torch 2.8.0, torchvision 0.23.0 (JetPack 6.2.3용 CUDA 빌드)
+numpy==2.0.0
+scipy==1.15.3
+opencv-python==4.10.0.84
+PyYAML>=5.4.1            # 확인한 버전 5.4.1 (Ubuntu 22.04 python3-yaml). 5.4.1은 Python 3.10용 휠이 없어 하한만 둠
+open3d==0.20.0           # lidar_point.py (포인트 클라우드 3D 대응점 선택)
+segments-ai==1.32.0      # upload_to_segments.py, upload_label.py

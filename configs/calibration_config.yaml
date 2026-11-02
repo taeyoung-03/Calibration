@@ -1,0 +1,66 @@
+# LiDAR–카메라 정합 설정 (calibration.py, depth_map.py, 대응점 선택·업로드 코드가 데이터 경로를 같이 씀)
+data_root: "label_sample"     # 데이터 폴더 (저장소 기준 상대 경로 또는 절대 경로). CAMERA/<카메라>/<번호 6자리>.jpg, LiDAR/<번호 6자리>.pcd
+cameras: [camera1, camera2, camera3, camera6]
+frames: {start: 1, end: 5830, step: 10}   # 처리할 프레임 번호 (카메라별 기준 프레임은 간격에 안 맞아도 포함)
+workers: 8                    # 프레임 병렬 처리 프로세스 수
+
+lidar:
+  field: intensity            # Δv 밝기 NID에 쓸 LiDAR 값 (log 후 1~99% 정규화)
+  min_range: 5.0              # 센서에서 이보다 가까운 포인트(선체) 제거 (m)
+
+depth:                        # depth_map.py (Depth Anything V2 Small, Apache-2.0)
+  checkpoint: checkpoints/depth_anything_v2_vits.pth
+  input_size: 1080            # 모델 입력 짧은 변 (14의 배수로 올림 → 1080이면 1092)
+  save_scale: 1.0             # 저장 크기 = 원본 × 이 값 (measure에서 원본 크기로 다시 늘림)
+  dir: depth                  # 깊이 맵 폴더 (out/ 아래)
+
+measure:                      # calibration.py measure: 프레임·카메라별 (Δu, Δv)
+  search_px: {u: 50, v: 20}   # ± 탐색 범위 (px)
+  coarse_px: 5                # 거친 탐색 간격
+  fine_px: 5                  # 거친 최저점 주변 ± 이 범위를 1px 간격으로
+  edge_margin_px: 5           # 답이 탐색 범위 끝에서 이 거리 안이면(|Δ| ≥ 범위 − 이 값) 측정으로 안 씀
+  blur_sigma: 1.5             # 영상·깊이 맵 가우시안 블러 (px). 0 = 끔
+  mask_bottom: {camera1: 0.3, camera2: 0.3, camera3: 0.3, camera6: 0.3}   # 영상 아래 이 비율 제외 (선수·가까운 수면)
+  min_points: 500             # 남은 포인트가 이보다 적으면 측정 안 함
+  hist: {bins: 16, min_distinct: 0.005, sep_px: 15}
+                              # Δv 밝기 NID: 히스토그램 칸 수, 사용 판정 = sep_px 밖 최저 NID가 답보다 min_distinct 이상 높아야 함
+  pairs: {neighbors: 8, max_px: 15}
+                              # Δu 이웃 쌍: 포인트마다 영상에서 가까운 이웃 수, 이웃으로 칠 최대 거리 (px)
+  depth_score:                # Δu 깊이 점수 (깊이 맵이 LiDAR 거리와 분명히 모순되는 것만 셈)
+    eps: 0.001                #   깊이 맵 값에 더하는 작은 값 (하늘 ≈ 0끼리 나눗셈 방지)
+    edge_ratio: 1.2           #   LiDAR 거리가 이 배 넘게 다르면 가까움·멂 쌍, 아니면 이어짐 쌍
+    break_ratio: 1.5          #   이어짐 쌍인데 깊이 맵 두 값이 이 배 넘게 다르면 경계 모순
+    sign_soft: 0.02           #   가까움·멂 쌍 방향 판정 하한: 두 깊이 맵 값 평균의 이 비율 ...
+    noise_mult: 3.0           #   ... 과 그 거리대 깊이 맵 흔들림의 이 배 중 큰 값보다 반대로 다르면 경계 모순
+    group_ratio: 1.5          #   깊이 맵 흔들림을 잴 거리대 칸 간격 (쌍의 가까운 포인트 거리가 이 배씩)
+    sky_thr: 0.0005           #   깊이 모델의 하늘 (블러 전 깊이 맵 값 이하, 화면 맨 위와 이어진 영역)
+    sky_edge_px: 2            #   하늘 경계에서 이만큼 안쪽만 '확실한 하늘'
+    sky_tol: 1.0              #   하늘 포인트가 가장 적은 위치보다 sky_tol·√(최저+1)개 넘게 많은 위치는 답으로 안 고름
+    sky_skip_isolated: true   #   LiDAR로 이어진 이웃이 없는 포인트(새·물보라)는 하늘 포인트로 안 셈
+    cap_sigma: 3.0            #   분포: 그 거리 정상 흔들림의 이 배 넘게 벗어나면 모순 하나 (점수 cap²). 경계 모순 쌍도 하나에 cap²
+    curve_bins: 30            #   거리 → 정상 깊이 맵 값 곡선을 잴 log 거리 분위 칸 수
+    noise_bins: 10            #   거리별 정상 흔들림을 잴 log 거리 분위 칸 수
+  min_distinct_rel: 0.25      # Δu 사용 판정: axis_sep_px 밖 최저 점수가 답보다 가로선 점수 표준편차의 이 배 이상 높아야 함
+  axis_sep_px: 15             # Δu 판정에서 비교할 다른 후보와의 최소 거리 (px). 기준표 보완 범위로도 씀
+
+kalman:                       # calibration.py kalman: 시간 방향 처리
+  u_sigma_px: 2.0             # Δu 측정 잡음 σ. 측정마다 R = σ² · (뚜렷함 중앙값 / 그 측정 뚜렷함). 작을수록 측정값을 그대로 따름
+  v_sigma_px: 1.0             # Δv 측정 잡음 σ
+  v_decay_frames: 10          # Δv: 측정 없는 구간이 길면 기준(0)으로 돌아가는 시간 상수 (칼만 프레임 칸). a = exp(−1/이 값). Δu는 a = 1
+  r_data: {min_pairs: 5, floor_px: 0.5, fallback_px: 3.0, v_max_lag: 5}
+                              # 한 칸 실제 변화 q (카메라·축별, 데이터에서). L칸 떨어진 측정 차이 분산(MAD) = 2σ² + L·q²
+                              # Δu: q² = 1칸 차이 분산 − 2σ². Δv: 1~v_max_lag칸 차이 분산을 L에 직선으로 맞춘 기울기
+                              # 쌍이 min_pairs 미만이면 fallback_px, 하한 floor_px
+  spike: {gate: 3.0, max_gap: 5}
+                              # 튐 제거: 바로 앞·뒤 측정(max_gap칸 안)끼리는 맞는데 이 측정만 둘 다와
+                              # gate·√(2σ² + 칸 수·q²) 넘게 다르면 버림. 한쪽과 이어지면 급변으로 유지
+  isolation: {window_frames: 50, tol_px: 15}
+                              # 프레임 번호로 앞뒤 window_frames 안에 tol_px 이내로 비슷한 다른 측정이 없으면 고립 측정으로 버림
+  cross: {min_frames: 3, tol_px: 4.0}
+                              # Δu 빈 구간(양 끝 측정, min_frames칸 이상)에서 다른 카메라 공통 흐름이 양 끝을 이은 직선에서
+                              # 벗어났다 돌아오면(방향 바뀜) 굴곡 × β(회귀 기울기)를 더함. β·굴곡이 tol_px 넘을 때만
+  # 기준 프레임(camera_lidar_extrinsic.yaml의 reference)은 보정 0으로 고정하고 앞뒤로 필터. 없으면 첫 프레임.
+
+render:                       # calibration.py render (pnp 확인 영상의 포인트 크기도 같이 씀)
+  step: 100                   # 투영 영상을 그릴 프레임 간격
+  point_size: 2               # 포인트 반지름 (px)
